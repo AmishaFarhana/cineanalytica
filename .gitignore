@@ -1,5 +1,20 @@
+# Data + DB
 data/raw/*.csv
+data/raw/*.zip
 *.db
-__pycache__/
-.DS_Store
+
+# Models + artifacts
 models/*.pkl
+*.pkl
+
+# Python junk
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Env
+.venv/
+.env
+
+# Mac
+.DS_Store
