@@ -42,9 +42,9 @@ scikit-learn==1.8.0
 scikit-surprise==1.1.4
 scipy==1.17.1
 seaborn==0.13.2
-shap==0.50.0
+shap==0.44.0
 six==1.17.0
-slicer==0.0.8
+slicer==0.0.7
 smmap==5.0.2
 streamlit==1.54.0
 tenacity==9.1.4
