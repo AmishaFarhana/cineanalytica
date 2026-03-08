@@ -28,6 +28,22 @@ def run_sql(query: str, params=None):
     with get_conn() as conn:
         return pd.read_sql_query(query, conn, params=params)
 
+@st.cache_data(show_spinner=False)
+def get_homepage_stats():
+    """Fetch homepage statistics from database"""
+    query = """
+    SELECT
+        (SELECT COUNT(*) FROM movies) as total_movies,
+        (SELECT COUNT(*) FROM ratings) as total_ratings,
+        (SELECT COUNT(*) FROM reviews) as total_reviews,
+        (SELECT COUNT(*) FROM actors) as total_actors,
+        (SELECT COUNT(*) FROM directors) as total_directors,
+        (SELECT ROUND(AVG(vote_average), 2) FROM movies WHERE vote_average > 0) as avg_rating
+    """
+    with get_conn() as conn:
+        df = pd.read_sql_query(query, conn)
+    return df.iloc[0].to_dict()
+
 def build_filter_sql(selected_year, selected_genre):
     """
     Returns: (join_sql, where_sql, params)
@@ -68,7 +84,34 @@ def build_filter_sql(selected_year, selected_genre):
 # -----------------------------
 st.set_page_config(page_title="CineAnalytica", layout="wide")
 st.title("🎬 CineAnalytica Dashboard")
-st.write("Welcome to the SQL + Analytics dashboard!")
+
+# Homepage statistics
+try:
+    stats = get_homepage_stats()
+    
+    # Row 1: Total Movies, Avg Rating, Total Actors
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("🎬 Total Movies", f"{stats['total_movies']:,}")
+    with col2:
+        st.metric("⭐ Avg Rating", stats['avg_rating'])
+    with col3:
+        st.metric("🎭 Total Actors", f"{stats['total_actors']:,}")
+    
+    # Row 2: Total Directors, Total Ratings, Total Reviews
+    col4, col5, col6 = st.columns(3)
+    with col4:
+        st.metric("🎬 Total Directors", f"{stats['total_directors']:,}")
+    with col5:
+        st.metric("🗳️ Total Ratings", f"{stats['total_ratings']:,}")
+    with col6:
+        st.metric("💬 Total Reviews", f"{stats['total_reviews']:,}")
+    
+    st.divider()
+except Exception as e:
+    st.warning(f"Could not load homepage statistics: {e}")
+
+st.markdown("### 🔍 Explore 5,000 movies · ML predictions · Sentiment analysis · Recommendations")
 
 # Quick schema debug (super useful while building)
 with st.expander("🧾 Debug: Show available tables (schema check)"):

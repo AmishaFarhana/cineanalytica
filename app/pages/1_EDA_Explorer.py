@@ -132,29 +132,35 @@ def get_genre_trends(genres, year_start, year_end):
     ORDER BY year, g.genre_name
     """
     params = [year_start, year_end] + (genres if genres else [])
-    df = pd.read_sql_query(query, conn, params=params)
-    conn.close()
+    
+    with st.spinner("Loading genre trends..."):
+        df = pd.read_sql_query(query, conn, params=params)
+        conn.close()
     
     sql_display = query.replace('?', '{}').format(year_start, year_end, *[f"'{g}'" for g in genres] if genres else [])
     return df, sql_display
 
-genre_trends_df, genre_trends_sql = get_genre_trends(selected_genres, year_range[0], year_range[1])
+try:
+    genre_trends_df, genre_trends_sql = get_genre_trends(selected_genres, year_range[0], year_range[1])
 
-if not genre_trends_df.empty:
-    fig = px.line(
-        genre_trends_df,
-        x='year',
-        y='movie_count',
-        color='genre_name',
-        title='Number of Movies Released by Genre Over Time',
-        labels={'year': 'Year', 'movie_count': 'Number of Movies', 'genre_name': 'Genre'}
-    )
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.warning("No data available for selected filters")
+    if not genre_trends_df.empty:
+        fig = px.line(
+            genre_trends_df,
+            x='year',
+            y='movie_count',
+            color='genre_name',
+            title='Number of Movies Released by Genre Over Time',
+            labels={'year': 'Year', 'movie_count': 'Number of Movies', 'genre_name': 'Genre'}
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("No data available for selected filters")
 
-with st.expander("View SQL used"):
-    st.code(genre_trends_sql, language="sql")
+    with st.expander("View SQL used"):
+        st.code(genre_trends_sql, language="sql")
+        
+except Exception as e:
+    st.error(f"Error loading genre trends: {e}")
 
 # Section 3: Budget vs Revenue Scatter
 st.header("💵 Budget vs Revenue Analysis")
@@ -178,78 +184,137 @@ def get_budget_revenue(genres, year_start, year_end):
     {'AND g.genre_name IN (' + ','.join(['?' for _ in genres]) + ')' if genres else ''}
     """
     params = [year_start, year_end] + (genres if genres else [])
-    df = pd.read_sql_query(query, conn, params=params)
-    conn.close()
+    
+    with st.spinner("Loading budget vs revenue data..."):
+        df = pd.read_sql_query(query, conn, params=params)
+        conn.close()
     
     sql_display = query.replace('?', '{}').format(year_start, year_end, *[f"'{g}'" for g in genres] if genres else [])
     return df, sql_display
 
-budget_revenue_df, budget_revenue_sql = get_budget_revenue(selected_genres, year_range[0], year_range[1])
+try:
+    budget_revenue_df, budget_revenue_sql = get_budget_revenue(selected_genres, year_range[0], year_range[1])
 
-if not budget_revenue_df.empty:
-    fig = px.scatter(
-        budget_revenue_df,
-        x='budget',
-        y='revenue',
-        color='genre_name',
-        hover_data=['title', 'vote_average'],
-        title='Budget vs Revenue by Genre',
-        labels={'budget': 'Budget ($)', 'revenue': 'Revenue ($)', 'genre_name': 'Genre'},
-        opacity=0.6
-    )
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.warning("No data available for selected filters")
+    if not budget_revenue_df.empty:
+        fig = px.scatter(
+            budget_revenue_df,
+            x='budget',
+            y='revenue',
+            color='genre_name',
+            hover_data=['title', 'vote_average'],
+            title='Budget vs Revenue by Genre',
+            labels={'budget': 'Budget ($)', 'revenue': 'Revenue ($)', 'genre_name': 'Genre'},
+            opacity=0.6,
+            trendline="ols"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("No data available for selected filters")
 
-with st.expander("View SQL used"):
-    st.code(budget_revenue_sql, language="sql")
+    with st.expander("View SQL used"):
+        st.code(budget_revenue_sql, language="sql")
+        
+except Exception as e:
+    st.error(f"Error loading budget vs revenue data: {e}")
 
-# Section 4: Top Actors by Average Revenue
-st.header("🎭 Top Actors by Average Revenue")
+# Section 4: Top Actors by Star Power (Window Function Showcase)
+st.header("🎭 Top Actors by Star Power")
 
 @st.cache_data
-def get_top_actors(genres, year_start, year_end):
-    """Fetch top actors by average revenue"""
+def get_top_actors_with_rank(genres, year_start, year_end):
+    """Fetch top actors by average revenue using window function"""
     conn = sqlite3.connect(DB_PATH)
-    query = f"""
+    
+    # Build the base query with window function
+    base_query = """
     SELECT 
         a.actor_name,
-        COUNT(DISTINCT m.movie_id) as movie_count,
+        COUNT(mc.movie_id) as num_movies,
         AVG(m.revenue) as avg_revenue,
-        SUM(m.revenue) as total_revenue
+        RANK() OVER (ORDER BY AVG(m.revenue) DESC) as revenue_rank
     FROM actors a
     JOIN movie_cast mc ON a.actor_id = mc.actor_id
     JOIN movies m ON mc.movie_id = m.movie_id
-    LEFT JOIN movie_genres mg ON m.movie_id = mg.movie_id
-    LEFT JOIN genres g ON mg.genre_id = g.genre_id
     WHERE m.revenue > 0
-    {year_filter}
-    {'AND g.genre_name IN (' + ','.join(['?' for _ in genres]) + ')' if genres else ''}
-    GROUP BY a.actor_id, a.actor_name
-    HAVING movie_count >= 3
-    ORDER BY avg_revenue DESC
-    LIMIT 20
     """
-    params = [year_start, year_end] + (genres if genres else [])
-    df = pd.read_sql_query(query, conn, params=params)
-    conn.close()
     
-    sql_display = query.replace('?', '{}').format(year_start, year_end, *[f"'{g}'" for g in genres] if genres else [])
+    # Add filters if needed
+    if genres or (year_start and year_end):
+        # Need to add joins for filtering
+        query = """
+        SELECT 
+            a.actor_name,
+            COUNT(DISTINCT m.movie_id) as num_movies,
+            AVG(m.revenue) as avg_revenue,
+            RANK() OVER (ORDER BY AVG(m.revenue) DESC) as revenue_rank
+        FROM actors a
+        JOIN movie_cast mc ON a.actor_id = mc.actor_id
+        JOIN movies m ON mc.movie_id = m.movie_id
+        LEFT JOIN movie_genres mg ON m.movie_id = mg.movie_id
+        LEFT JOIN genres g ON mg.genre_id = g.genre_id
+        WHERE m.revenue > 0
+        """
+        
+        # Add year filter
+        if year_start and year_end:
+            query += f" AND CAST(strftime('%Y', m.release_date) AS INTEGER) BETWEEN ? AND ?"
+        
+        # Add genre filter
+        if genres:
+            query += f" AND g.genre_name IN ({','.join(['?' for _ in genres])})"
+        
+        query += """
+        GROUP BY a.actor_id, a.actor_name
+        HAVING num_movies >= 3
+        ORDER BY avg_revenue DESC
+        LIMIT 20
+        """
+        
+        params = []
+        if year_start and year_end:
+            params.extend([year_start, year_end])
+        if genres:
+            params.extend(genres)
+    else:
+        query = base_query + """
+        GROUP BY a.actor_id, a.actor_name
+        HAVING COUNT(mc.movie_id) >= 3
+        ORDER BY avg_revenue DESC
+        LIMIT 20
+        """
+        params = []
+    
+    with st.spinner("Loading top actors with window function..."):
+        df = pd.read_sql_query(query, conn, params=params)
+        conn.close()
+    
+    # Format SQL for display
+    sql_display = query
+    if params:
+        for param in params:
+            if isinstance(param, str):
+                sql_display = sql_display.replace('?', f"'{param}'", 1)
+            else:
+                sql_display = sql_display.replace('?', str(param), 1)
+    
     return df, sql_display
 
-top_actors_df, top_actors_sql = get_top_actors(selected_genres, year_range[0], year_range[1])
+try:
+    top_actors_df, top_actors_sql = get_top_actors_with_rank(selected_genres, year_range[0], year_range[1])
 
-if not top_actors_df.empty:
-    # Format currency columns
-    display_df = top_actors_df.copy()
-    display_df['avg_revenue'] = display_df['avg_revenue'].apply(lambda x: f"${x:,.0f}")
-    display_df['total_revenue'] = display_df['total_revenue'].apply(lambda x: f"${x:,.0f}")
-    st.dataframe(display_df, use_container_width=True)
-else:
-    st.warning("No data available for selected filters")
+    if not top_actors_df.empty:
+        # Format currency columns for display
+        display_df = top_actors_df.copy()
+        display_df['avg_revenue'] = display_df['avg_revenue'].apply(lambda x: f"${x:,.0f}")
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+    else:
+        st.warning("No data available for selected filters")
 
-with st.expander("View SQL used"):
-    st.code(top_actors_sql, language="sql")
+    with st.expander("Window Function SQL"):
+        st.code(top_actors_sql, language="sql")
+        
+except Exception as e:
+    st.error(f"Error loading actor data: {e}")
 
 # Section 5: Monthly Release Heatmap
 st.header("📅 Monthly Release Patterns")
@@ -261,8 +326,8 @@ def get_monthly_revenue(genres, year_start, year_end):
     query = f"""
     SELECT 
         CAST(strftime('%m', m.release_date) AS INTEGER) as month,
-        AVG(m.revenue) as avg_revenue,
-        COUNT(m.movie_id) as movie_count
+        COUNT(*) as num_releases,
+        AVG(m.revenue) as avg_revenue
     FROM movies m
     LEFT JOIN movie_genres mg ON m.movie_id = mg.movie_id
     LEFT JOIN genres g ON mg.genre_id = g.genre_id
@@ -273,8 +338,10 @@ def get_monthly_revenue(genres, year_start, year_end):
     ORDER BY month
     """
     params = [year_start, year_end] + (genres if genres else [])
-    df = pd.read_sql_query(query, conn, params=params)
-    conn.close()
+    
+    with st.spinner("Loading monthly release patterns..."):
+        df = pd.read_sql_query(query, conn, params=params)
+        conn.close()
     
     # Add month names
     month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -283,30 +350,34 @@ def get_monthly_revenue(genres, year_start, year_end):
     sql_display = query.replace('?', '{}').format(year_start, year_end, *[f"'{g}'" for g in genres] if genres else [])
     return df, sql_display
 
-monthly_revenue_df, monthly_revenue_sql = get_monthly_revenue(selected_genres, year_range[0], year_range[1])
+try:
+    monthly_revenue_df, monthly_revenue_sql = get_monthly_revenue(selected_genres, year_range[0], year_range[1])
 
-if not monthly_revenue_df.empty:
-    fig = px.bar(
-        monthly_revenue_df,
-        x='month_name',
-        y='avg_revenue',
-        title='Average Revenue by Release Month',
-        labels={'month_name': 'Month', 'avg_revenue': 'Average Revenue ($)'},
-        color='avg_revenue',
-        color_continuous_scale='Viridis'
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Show movie count per month
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Most Profitable Month", 
-                  monthly_revenue_df.loc[monthly_revenue_df['avg_revenue'].idxmax(), 'month_name'])
-    with col2:
-        st.metric("Most Releases", 
-                  monthly_revenue_df.loc[monthly_revenue_df['movie_count'].idxmax(), 'month_name'])
-else:
-    st.warning("No data available for selected filters")
+    if not monthly_revenue_df.empty:
+        fig = px.bar(
+            monthly_revenue_df,
+            x='month_name',
+            y='avg_revenue',
+            title='Average Revenue by Release Month',
+            labels={'month_name': 'Month', 'avg_revenue': 'Average Revenue ($)'},
+            color='num_releases',
+            color_continuous_scale='Viridis'
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Show movie count per month
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Most Profitable Month", 
+                      monthly_revenue_df.loc[monthly_revenue_df['avg_revenue'].idxmax(), 'month_name'])
+        with col2:
+            st.metric("Most Releases", 
+                      monthly_revenue_df.loc[monthly_revenue_df['num_releases'].idxmax(), 'month_name'])
+    else:
+        st.warning("No data available for selected filters")
 
-with st.expander("View SQL used"):
-    st.code(monthly_revenue_sql, language="sql")
+    with st.expander("View SQL used"):
+        st.code(monthly_revenue_sql, language="sql")
+        
+except Exception as e:
+    st.error(f"Error loading monthly release data: {e}")
