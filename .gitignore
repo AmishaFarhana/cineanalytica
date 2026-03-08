@@ -18,3 +18,5 @@ __pycache__/
 
 # Mac
 .DS_Store
+
+models/recommender_artifacts.joblib
