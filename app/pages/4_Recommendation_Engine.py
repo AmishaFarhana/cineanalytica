@@ -8,10 +8,30 @@ import joblib
 from pathlib import Path
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
+import importlib.util as _ilu
+_rec_path = Path(__file__).resolve().parents[1] / "utils" / "recommenders.py"
+_rec_spec = _ilu.spec_from_file_location("recommenders", _rec_path)
+_rec_mod = _ilu.module_from_spec(_rec_spec)
+_rec_spec.loader.exec_module(_rec_mod)
+recommend_by_title = _rec_mod.recommend_by_title
+hybrid_recommend_for_user = _rec_mod.hybrid_recommend_for_user
+load_hybrid_params = _rec_mod.load_hybrid_params
+
 
 # Page config
 st.set_page_config(page_title="Recommendation Engine", page_icon="🎯", layout="wide")
 st.title("🎯 Movie Recommendation Engine")
+
+st.markdown("*Discover movies you'll love using content-based and collaborative filtering.*")
+st.divider()
+
+with st.expander("ℹ️ How to use this page"):
+    st.markdown("""
+- **Content-Based**: Select a movie to find similar ones by genre
+- **Collaborative Filtering**: Pick a user ID to get personalized SVD predictions
+- **Popular by Genre**: Browse top-rated movies in any genre
+- **Hidden Gems**: Discover high-rated movies with low popularity scores
+""")
 
 # Paths
 DB_PATH = Path(__file__).resolve().parents[2] / 'data' / 'cineanalytica.db'
@@ -416,3 +436,64 @@ else:
 # Additional info
 st.divider()
 st.info("💡 **Tip:** Content-based recommendations use movie features like genres, while collaborative filtering learns from user rating patterns. Try both approaches to discover new movies!")
+
+st.divider()
+st.header("🔀 Hybrid Recommendations")
+st.markdown("*Combines genre-based content similarity + collaborative SVD filtering, tuned by Recall@10*")
+
+params = load_hybrid_params()
+
+col1, col2 = st.columns(2)
+col1.metric("Hybrid Alpha (tuned)", params['alpha'])
+col2.metric("Like Threshold", params['like_threshold'])
+
+user_id_hybrid = st.number_input(
+    "Enter User ID", 
+    min_value=1, 
+    max_value=1000, 
+    value=1, 
+    step=1,
+    key="hybrid_user_id"
+)
+
+if st.button("🎬 Get Hybrid Recommendations", key="hybrid_btn"):
+    with st.spinner("Blending SVD + content signals..."):
+        try:
+            hybrid_df = hybrid_recommend_for_user(
+                user_id=int(user_id_hybrid),
+                alpha=params['alpha'],
+                top_n=10,
+                like_threshold=params['like_threshold']
+            )
+            
+            if hybrid_df.empty:
+                st.warning("No recommendations found. This user may have no ratings in the database.")
+            else:
+                st.success(f"Top {len(hybrid_df)} hybrid recommendations for User {user_id_hybrid}")
+                st.dataframe(
+                    hybrid_df[['title', 'genre_text', 'hybrid_score']].rename(
+                        columns={
+                            'title': 'Movie',
+                            'genre_text': 'Genres',
+                            'hybrid_score': 'Hybrid Score'
+                        }
+                    ).reset_index(drop=True),
+                    use_container_width=True
+                )
+                
+                with st.expander("ℹ️ How hybrid scoring works"):
+                    st.markdown("""
+**Hybrid Score = α × SVD score + (1 − α) × Content score**
+
+- **SVD (Collaborative Filtering):** Predicts your rating based on users with similar taste
+- **Content Filtering:** Finds movies similar in genre to ones you've liked (rated ≥ {:.1f})
+- **Alpha = {:.1f}** means the model leans {}% on SVD and {}% on content similarity
+- Both scores are normalized to [0, 1] before blending
+""".format(
+                        params['like_threshold'],
+                        params['alpha'],
+                        int(params['alpha']*100),
+                        int((1-params['alpha'])*100)
+                    ))
+        except Exception as e:
+            st.error(f"Could not generate hybrid recommendations: {e}")
