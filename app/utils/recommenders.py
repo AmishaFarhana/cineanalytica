@@ -112,7 +112,7 @@ def _build_content_recommender_impl():
         ngram_range=(1, 2),
         max_features=50000
     )
-    tfidf_matrix = tfidf.fit_transform(movies2['combined_text'])
+    tfidf_matrix = tfidf.fit_transform(movies2["genre_text"].fillna(""))
     
     # Compute cosine similarity
     cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
