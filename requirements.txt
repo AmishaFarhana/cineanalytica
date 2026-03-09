@@ -58,3 +58,4 @@ urllib3==2.6.3
 wordcloud==1.9.6
 xgboost==3.2.0
 statsmodels
+pytest==8.0.0

@@ -169,12 +169,22 @@ def recommend_by_title(title, top_n=10):
     idx = title_to_idx[title_lower]
     sim_scores = list(enumerate(cosine_sim[idx]))
     
-    # Sort by similarity (excluding the movie itself)
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)[1:top_n+1]
+    # Sort by similarity (excluding the movie itself at position idx)
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    
+    # Filter out the query movie itself and get top_n
+    query_movie_id = movies2.iloc[idx]['movie_id']
+    filtered_scores = []
+    for i, score in sim_scores:
+        # Skip if it's the same movie_id (handles duplicates)
+        if movies2.iloc[i]['movie_id'] != query_movie_id:
+            filtered_scores.append((i, score))
+            if len(filtered_scores) >= top_n:
+                break
     
     # Get movie indices and scores
-    movie_indices = [i[0] for i in sim_scores]
-    scores = [i[1] for i in sim_scores]
+    movie_indices = [i[0] for i in filtered_scores]
+    scores = [i[1] for i in filtered_scores]
     
     # Build result DataFrame
     result = pd.DataFrame({
