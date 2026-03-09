@@ -1,7 +1,8 @@
 # Data + DB
 data/raw/*.csv
 data/raw/*.zip
-*.db
+# Note: app/assets/cineanalytica.db is tracked via Git LFS (see .gitattributes)
+data/*.db
 
 # Models + artifacts
 models/*.pkl
