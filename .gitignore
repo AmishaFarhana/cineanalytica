@@ -4,8 +4,6 @@ data/raw/*.zip
 # Note: app/assets/cineanalytica.db is tracked via Git LFS (see .gitattributes)
 
 # Models + artifacts
-models/*.pkl
-*.pkl
 
 # Python junk
 __pycache__/
