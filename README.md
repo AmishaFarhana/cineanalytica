@@ -2,9 +2,6 @@
 
 > A full-stack movie analytics and recommendation platform built with Python, Streamlit, and Machine Learning.
 
-[
-[
-[
 
 ***
 
