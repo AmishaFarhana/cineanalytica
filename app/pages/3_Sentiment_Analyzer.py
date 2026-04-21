@@ -11,6 +11,16 @@ import joblib
 st.set_page_config(page_title="Sentiment Analyzer", page_icon="😊", layout="wide")
 st.title("😊 Movie Review Sentiment Analyzer")
 
+st.markdown("*Analyze the sentiment of movie overviews using our trained NLP pipeline.*")
+st.divider()
+
+with st.expander("ℹ️ How to use this page"):
+    st.markdown("""
+- **Search a movie** by title and select it to analyze its overview sentiment
+- Scroll down for **Batch Analysis** showing sentiment distribution across all movies
+- The **Genre Breakdown** shows which genres tend to have more positive overviews
+""")
+
 # Paths
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'cineanalytica.db')
 MODEL_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'models', 'sentiment_model.joblib')

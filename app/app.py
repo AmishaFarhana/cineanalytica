@@ -111,7 +111,21 @@ try:
 except Exception as e:
     st.warning(f"Could not load homepage statistics: {e}")
 
-st.markdown("### 🔍 Explore 5,000 movies · ML predictions · Sentiment analysis · Recommendations")
+st.markdown("#### An end-to-end Movie Intelligence Platform powered by SQL · ML · NLP")
+
+st.divider()
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.info("� **EDA Explorer**\nInteractive charts exploring 5,000 movies by genre, budget, revenue and star power.")
+with col2:
+    st.success("🎬 **Box Office Predictor**\nXGBoost ML model predicting revenue from budget, genre, cast and release timing.")
+with col3:
+    st.warning("😊 **Sentiment Analyzer**\nNLP pipeline classifying movie overview sentiment with batch analysis and genre breakdown.")
+with col4:
+    st.error("🎯 **Recommendation Engine**\nContent-based TF-IDF + collaborative SVD recommender with hidden gems discovery.")
+
+st.divider()
 
 # Quick schema debug (super useful while building)
 with st.expander("🧾 Debug: Show available tables (schema check)"):
@@ -120,6 +134,10 @@ with st.expander("🧾 Debug: Show available tables (schema check)"):
 # -----------------------------
 # Sidebar: Filters + Navigation
 # -----------------------------
+st.sidebar.markdown("# 🎬 CineAnalytica")
+st.sidebar.markdown("*Movie Intelligence Platform*")
+st.sidebar.divider()
+
 st.sidebar.header("Filters")
 
 # Release years dropdown (optional)

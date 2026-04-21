@@ -10,6 +10,16 @@ import joblib
 st.set_page_config(page_title="Box Office Predictor", page_icon="🎬", layout="wide")
 st.title("🎬 Box Office Revenue Predictor")
 
+st.markdown("*Predict movie revenue using our XGBoost model trained on budget, genre, cast and release data.*")
+st.divider()
+
+with st.expander("ℹ️ How to use this page"):
+    st.markdown("""
+- Fill in the **movie details** on the left panel and click Predict
+- The model returns a predicted revenue with confidence range
+- Use the **feature importance** chart to understand what drives the prediction
+""")
+
 # Paths
 MODEL_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'models', 'box_office_xgb.joblib')
 

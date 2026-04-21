@@ -9,6 +9,16 @@ from datetime import datetime
 st.set_page_config(page_title="EDA Explorer", page_icon="📊", layout="wide")
 st.title("📊 Exploratory Data Analysis")
 
+st.markdown("*Explore trends, budgets, revenues and star power across 5,000 movies using interactive SQL-backed charts.*")
+st.divider()
+
+with st.expander("ℹ️ How to use this page"):
+    st.markdown("""
+- Use the **sidebar filters** to narrow by year range and genre
+- Scroll down to explore Genre Trends, Budget vs Revenue scatter, Star Power rankings, and Monthly Heatmap
+- Click **View SQL used** under any chart to see the exact query behind it
+""")
+
 # Database connection
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'cineanalytica.db')
 
